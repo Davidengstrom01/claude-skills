@@ -90,17 +90,52 @@ Question whether the design and how it is built hold up.
 
 ## Phase 3: Find code improvements
 
-Go through the diff file by file and line by line. List every improvement.
+Go through the diff file by file and line by line, then read the code around each hunk. Never judge a hunk alone.
 
 1. **Walk every changed file.** Record each file as reviewed, even when it has no findings.
-2. **Look for:** bugs and off-by-one errors, unhandled nulls and exceptions, scattered or duplicated rules, fragile flag combinations, casts and silent fallbacks, unclear ownership, leaky abstractions, dead code, naming that misleads, missing or weak tests, performance issues, logging and error messages, and inconsistency with codebase conventions.
-3. **Propose the fix.** Every improvement gets a concrete alternative or a code suggestion.
+2. **Run the bug lens and the quality lens** (below) on every changed file, then the remaining checks.
+3. **Propose the fix.** Every improvement gets a concrete alternative or a code suggestion. For a quality finding, name what disappears.
 4. **Try to disprove each one.** Check callers, safeguards, tests, conventions, and phase 2 decisions. Drop what does not survive. Merge items with a shared root cause.
 5. **Classify each improvement:**
    - **Blocker:** a concrete defect or serious risk that must be fixed before merge.
    - **Should fix:** a substantial improvement that is worth doing in this PR.
    - **Nit:** minor cleanup, naming, or style. Keep these, labeled as nits.
 6. **Mark pre-existing issues** as such. They are not blockers unless this PR makes them worse.
+
+### Bug lens
+
+Audit what the diff adds or changes for bugs, broken behaviour and security holes. Trace side effects across modules: a change in one place often breaks a caller elsewhere. A pre-existing bug you meet while tracing is reported, tagged pre-existing; do not hunt the rest of the codebase.
+
+Also count:
+
+- **Flakiness.** Races, ordering or timing assumptions, handlers that are not safe to run twice.
+- **Devex breakage.** Changed secret or env var reading, renamed env vars, remapped ports, new manual steps to build or run. A new dependency is not one.
+- **Feature-gate leaks.** Gated or internal-only behaviour reachable without the gate.
+- **Idempotency and eventual consistency**, only when the diff touches message handlers, consumers, queue workers, scheduled jobs, retries or webhooks. Assume at-least-once delivery, no ordering, and that a throw re-runs the whole handler. Same message twice, same end state? Updated before Created, Deleted before Created, older after newer: does it converge? Look for a payload-driven destructive replace (clear then add, collection sync) with no staleness guard, a multi-step handler with a step that is not idempotent alone, and a new dual write (DB then publish) with no reconciliation. Check unique constraints in the schema or migrations; do not take the code's word.
+
+If the branch clearly intends a breakage (removing a flag, dropping a safeguard) and its scope is contained, skip it, unless the author likely has not seen the full impact.
+
+Trace every finding to the end. "Fine if the backend handles it" is unfinished when the backend is readable: go check. If you cannot trace the scenario, it is not a finding.
+
+### Quality lens
+
+A strict maintainability review. Be ambitious about deleting: look for the code judo move, a reframing that keeps behaviour and makes branches, helpers, modes, flags or whole layers disappear. A refactor that moves complexity around without removing any is not a finding.
+
+Hunt:
+
+- **Judo.** A different ownership boundary, state model, or existing mechanism the change could ride, so its new conditionals vanish.
+- **Spaghetti growth.** Conditionals bolted onto unrelated flows. One-off booleans or nullable modes threaded through layers. Special cases midway through a busy function. "Temporary" branches.
+- **Reuse and layer.** A bespoke helper where a canonical one exists (grep first). Copy-pasted logic. Feature logic leaking into shared code or sitting in the wrong layer.
+- **Indirection.** Thin wrappers, pass-through helpers, identity abstractions, generic magic hiding a simple data shape.
+- **Boundaries.** Casts, `any`, `unknown`, needless optionality, ad-hoc object shapes, silent fallbacks papering over an invariant.
+- **Orchestration.** Independent work serialized for no reason. Related updates that can leave state half-applied.
+- **Size.** A file grown too large to scan or understand, bundling things that can be separated out. Production code matters more here than test code.
+
+A remedy that adds an abstraction, layer or file without removing more than it adds is not a finding. Name what disappears. A few high-conviction findings beat many: this lens is the exception to listing every improvement.
+
+### Remaining checks
+
+Misleading names, dead code, missing or weak tests, performance, logging and error messages, and consistency with codebase conventions.
 
 **Output:** A complete list of improvements per file with location, problem, evidence, fix, and classification, plus the list of files with no improvements.
 
