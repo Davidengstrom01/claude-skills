@@ -118,7 +118,7 @@ Two or three lines in the same voice: specific credit where earned, the verdict,
 
 This is the only phase that talks to the user.
 
-**Notify first.** If a Slack tool is available, send the user one direct message (to their own user, never a channel): the PR link and title, the number of pending comments per classification, the number of open questions, the provisional verdict, and the link to this session if you know it. A few lines, no comment text. Without a Slack tool, skip this and say so in the opening message.
+**Notify once.** If a Slack tool is available, send the user one direct message (to their own user, never a channel): the PR link and title, the number of pending comments per classification, the number of open questions, the provisional verdict, and the link to this session if you know it. A few lines, no comment text. This is the only notification for the whole review: send no push notification or any other message, now or later in the grill. Without a Slack tool, skip this and say so in the opening message.
 
 Then open the grill with one message, in this order:
 
