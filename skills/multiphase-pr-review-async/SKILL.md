@@ -1,6 +1,6 @@
 ---
 name: "multiphase-pr-review-async"
-description: "Unattended variant of multiphase-pr-review: run all challenge phases without stopping, leave the findings as a pending (unsubmitted) GitHub review, then list every pending comment in chat and grill the user on them and on the open questions last. Use when a routine starts a review because the user was requested as reviewer, or on 'async review' / 'review and grill me after'."
+description: "Unattended variant of multiphase-pr-review: run all challenge phases without stopping, leave the findings as a pending (unsubmitted) GitHub review, then list every pending comment in chat and grill the user on them and on the open questions last. Skips PRs the user already reviewed until they are re-requested, then runs a follow-up review of what changed. Use when a routine starts a review because the user was requested as reviewer, or on 'async review' / 'review and grill me after'."
 ---
 
 # Multiphase PR Review (async)
@@ -41,6 +41,27 @@ The caller may limit the comment scope to certain paths (for example backend onl
 - If the PR changes no file inside the scope, stop before claiming: no writes, no notification.
 
 Without a stated scope, every changed file is in scope.
+
+## Already reviewed? Stop or follow up
+
+Check this after the scope check and before claiming. The user's **prior review** is their most recent submitted review on the PR (`COMMENTED`, `CHANGES_REQUESTED` or `APPROVED`; ignore `PENDING` and `DISMISSED`).
+
+1. **No prior review:** a first review. Run every phase as written.
+2. **Prior review, not requested again since:** the author has not handed it back yet. Stop with a one-line note: no claim, no writes, no notification. "Requested again" means a `review_requested` event naming the user in the PR timeline (`gh api repos/OWNER/REPO/issues/N/timeline --paginate`) after the prior review's `submitted_at`.
+3. **Requested again, but nothing changed:** no commits since the prior review's `commit_id` and no new author replies on the user's threads. Stop the same way.
+4. **Requested again and something changed:** a **follow-up review**. Run every phase in follow-up mode (below).
+
+### Follow-up mode
+
+- **Baseline.** Record the prior review's `commit_id` as the baseline. The delta is `git diff BASELINE..HEAD` when the baseline is an ancestor of the head; after a rebase or force push use `git range-diff` against the base branch, and if that fails, treat the whole PR diff as the delta and say so under limits.
+- **Prior threads.** Fetch every thread the user started on the PR, across all their submitted reviews (GraphQL `reviewThreads`: `isResolved`, `isOutdated`, path, line, every comment with author and time). Give each a status, judged against the finding, not just whether the lines moved:
+  - **Fixed:** the code now resolves it. Verify in the head, not from the author's word.
+  - **Answered:** the author replied with a reason instead of a change. Say whether the reason holds.
+  - **Resolved without change:** marked resolved with no fix and no reply.
+  - **Still open:** none of the above.
+- **Phases.** Phase 1 reopens the idea only if the delta or a reply changes it. Phases 2 and 3 cover the whole delta and what it touches in unchanged code (callers, tests, shared rules). On code the delta does not touch, post only new blockers; do not raise nits the first review passed over.
+- **Comments.** Pending comments are only for new findings. A prior finding never gets a second comment: list it in phase 5 with its status and, where it needs one, a drafted reply for its thread (never posted; replying is the user's call).
+- **Summary body.** Say what was fixed, what is still open, and the new findings, in the comment voice.
 
 ## The question list
 
@@ -138,17 +159,18 @@ Two or three lines in the same voice: specific credit where earned, the verdict,
 
 This is the only phase that talks to the user.
 
-**Notify once.** If a Slack tool is available, send the user one direct message (to their own user, never a channel): the PR link and title, the number of pending comments per classification, the number of open questions, the provisional verdict, and the link to this session if you know it. A few lines, no comment text. This is the only notification for the whole review: send no push notification or any other message, now or later in the grill. Without a Slack tool, skip this and say so in the opening message.
+**Notify once.** If a Slack tool is available, send the user one direct message (to their own user, never a channel): the PR link and title, whether it is a first or follow-up review, the number of pending comments per classification, for a follow-up the number of prior threads per status, the number of open questions, the provisional verdict, and the link to this session if you know it. A few lines, no comment text. This is the only notification for the whole review: send no push notification or any other message, now or later in the grill. Without a Slack tool, skip this and say so in the opening message.
 
 Then open the grill with one message, in this order:
 
-1. **The PR** (link, title, author, reviewed head commit) and the link to the pending review.
-2. **Every pending comment, verbatim**, numbered, each with its `path:line` anchor, side, and classification. Include comments that failed to land, marked as such. Then, if a comment scope applies, the findings outside it under "Outside scope, not posted".
-3. **The summary body and the provisional verdict.**
-4. **The question list**, numbered, each with your recommended answer.
-5. **Limits:** checks you could not run and phases that finished with limits.
+1. **The PR** (link, title, author, reviewed head commit) and the link to the pending review. For a follow-up, also the baseline commit and the prior review's link.
+2. **For a follow-up, the prior threads:** each with its anchor, the original comment, its status, the evidence, and any drafted reply.
+3. **Every pending comment, verbatim**, numbered, each with its `path:line` anchor, side, and classification. Include comments that failed to land, marked as such. Then, if a comment scope applies, the findings outside it under "Outside scope, not posted".
+4. **The summary body and the provisional verdict.**
+5. **The question list**, numbered, each with your recommended answer.
+6. **Limits:** checks you could not run and phases that finished with limits.
 
-Then invoke the `grill-me` skill and pass it the concept: first the question list, ordered so prerequisites come first, then each pending comment (keep, reword, change severity, or drop). If `grill-me` is unavailable, grill directly: one question at a time, each with your recommended answer. Review-specific rules:
+Then invoke the `grill-me` skill and pass it the concept: first the question list, ordered so prerequisites come first, then each pending comment (keep, reword, change severity, or drop), then for a follow-up each prior thread that is not fixed (accept the answer, keep pushing with the drafted reply, or let it go). If `grill-me` is unavailable, grill directly: one question at a time, each with your recommended answer. Review-specific rules:
 
 - A branch ends when further answers would not change a comment, its severity, or the verdict.
 - Record each answer, what changed, and which comments it affects.
