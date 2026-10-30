@@ -41,20 +41,34 @@ All phase instructions are in this file. Ignore any older `phases/` files.
 Stop at the end of every phase and hold a checkpoint. The user wants to follow and shape the review, not receive a verdict at the end.
 
 1. **Explain the phase.** In plain language: what you examined and how, the full list the phase produced, what you concluded and why, what you dismissed and why, assumptions and verification limits, and what the next phase will examine.
-2. **Grill (phases 1 and 2).** Run the `grill-me` skill on the phase's open decisions and assumption-dependent conclusions (see Grilling). In phases 3 and 4, invite the user's questions and challenges instead.
+2. **Grill (phases 1 and 2).** Run the `grill-me` skill on the author's decisions from this phase, with the open decisions and assumption-dependent conclusions merged in (see Grilling). In phases 3 and 4, invite the user's questions and challenges instead.
 3. **Advance on the user's go.** Ask whether to continue or dig further, using `AskUserQuestion` when available. Do not start the next phase until the user says so.
 
 ## Grilling
 
-Invoke the `grill-me` skill and pass it the concept to grill: the phase's list of open decisions and assumptions, ordered so prerequisites come first. Review-specific rules:
+The grill in phases 1 and 2 is about the author's decisions. Its goal is that the user understands every decision the author took and has a position on it. Invoke the `grill-me` skill and pass it the concept to grill: the phase's part of the decision list, ordered so prerequisites come first, with each open decision and unverified assumption merged into the decision it belongs to. For each decision:
 
-- A branch ends when further answers would not change a finding, its severity, or the requested action.
+1. **Explain it.** What the author decided, the alternatives, the author's reason (with its evidence, or labeled inferred), and the trade-off.
+2. **Ask one question** that makes the user take a position: would they have chosen it, does the reason hold, is the risk acceptable. Give your recommended answer and its evidence.
+
+Spend the depth on questionable or wrong decisions and open questions. Decisions that hold still get covered, but briefly: explain, confirm, move on. Review-specific rules:
+
+- A branch ends when the user understands the decision and further answers would not change a finding, its severity, or the requested action.
 - Record each answer, what changed, and which conclusions it affects.
 - End when every branch reaches a leaf or is explicitly marked unresolved, then summarize the decisions.
 - Do not repeat a question or treat silence as agreement. If an answer is missing, mark the affected work waiting.
 - Agreement with a design does not prove it correct, and disagreement does not invalidate an evidenced finding.
 
 During a phase, ask only questions that block the rest of that phase; save the rest for the checkpoint. If `grill-me` is unavailable, grill directly: one question at a time, each with your recommended answer.
+
+## The decision list
+
+Phases 1 and 2 record every decision the author took, so the grill can walk the user through the PR the way the author built it. Record all of them, including the ones you agree with.
+
+- **Idea decisions (phase 1):** how the problem is framed, the approach chosen over the alternatives, what is in and out of scope, and the assumptions the approach rests on.
+- **Implementation decisions (phase 2):** boundaries and ownership, the data model, contracts and message flows, how failures, retries and ordering are handled, migrations and compatibility, and what is tested.
+
+Each entry has: what the author decided; the alternatives they did not take; why they chose it, quoting the PR description, a commit message, the code or the ticket (if nothing says why, give the most likely reason and label it inferred); what it costs or risks; your verdict (holds, questionable, or wrong) with evidence; and the findings that hang on it.
 
 ## Phase 1: Challenge the idea
 
@@ -66,9 +80,9 @@ Question whether this PR should exist in this form.
 4. **Challenge the solution.** Is this the right approach to the problem? List the alternatives (different approach, smaller change, existing mechanism, config instead of code, fix elsewhere) and why this one wins or loses.
 5. **Map requirements to changes.** For every requirement, point to the code that fulfills it. List missing behavior, extra scope, and conflicts between ticket and code.
 6. **List every assumption** the idea rests on: about users, data, volumes, ordering, other teams, and existing behavior.
-7. **Grill** the concept with `grill-me` at the checkpoint.
+7. **Record** every idea decision on the decision list, then grill them with `grill-me` at the checkpoint.
 
-**Output:** The problem statement, full requirement map, every assumption, alternatives considered, and idea-level findings.
+**Output:** The problem statement, full requirement map, every assumption, alternatives considered, the idea decisions, and idea-level findings.
 
 **Complete when:** every requirement and assumption is listed and either supported, disputed, or marked unresolved, and no open question prevents judging the PR's purpose.
 
@@ -82,7 +96,7 @@ Question whether the design and how it is built hold up.
 4. **Check the edges.** Invalid input, empty and large data, missing configuration, migrations and backward compatibility, security and permissions, observability.
 5. **Check the tests.** For every requirement and failure path, is there a test that would fail if it broke? List the gaps.
 6. **Propose simpler designs** for each material concern, with benefit, cost, and effect on scope.
-7. **Grill** the implementation with `grill-me` at the checkpoint.
+7. **Record** every implementation decision on the decision list, then grill them with `grill-me` at the checkpoint.
 
 **Output:** Every design decision with its verdict, every failure scenario with its outcome, test gaps, and implementation findings.
 
