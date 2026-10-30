@@ -1,6 +1,6 @@
 ---
 name: "multiphase-pr-review-async"
-description: "Unattended variant of multiphase-pr-review: run all challenge phases without stopping, leave the findings as a pending (unsubmitted) GitHub review, then list every pending comment in chat and grill the user on them and on the open questions last. Skips PRs the user already reviewed until they are re-requested, then runs a follow-up review of what changed. Use when a routine starts a review because the user was requested as reviewer, or on 'async review' / 'review and grill me after'."
+description: "Unattended variant of multiphase-pr-review: run all challenge phases without stopping, leave the findings as a pending (unsubmitted) GitHub review, then list every pending comment in chat and grill the user on the author's idea and implementation decisions last. Skips PRs the user already reviewed until they are re-requested, then runs a follow-up review of what changed. Use when a routine starts a review because the user was requested as reviewer, or on 'async review' / 'review and grill me after'."
 ---
 
 # Multiphase PR Review (async)
@@ -65,7 +65,16 @@ Check this after the scope check and before claiming. The user's **prior review*
 
 ## The question list
 
-Keep one running list from phase 1 onward. Add an entry whenever a phase meets an open decision, an assumption you could not verify, or a conclusion that depends on intent only the user can supply. Each entry has: the question, why it matters (which finding or verdict it changes), your recommended answer, and the evidence behind that recommendation. Continue the phase on your recommended answer and label the dependent conclusions provisional.
+Keep one running list from phase 1 onward. Add an entry whenever a phase meets an open decision, an assumption you could not verify, or a conclusion that depends on intent only the user can supply. Each entry has: the question, why it matters (which finding or verdict it changes), your recommended answer, and the evidence behind that recommendation. Continue the phase on your recommended answer and label the dependent conclusions provisional. Tag each entry idea or implementation; a question that only concerns one line of code becomes a pending comment instead.
+
+## The decision list
+
+Phases 1 and 2 also record every decision the author took, so the grill can walk the user through the PR the way the author built it. Record all of them, including the ones you agree with.
+
+- **Idea decisions (phase 1):** how the problem is framed, the approach chosen over the alternatives, what is in and out of scope, and the assumptions the approach rests on.
+- **Implementation decisions (phase 2):** boundaries and ownership, the data model, contracts and message flows, how failures, retries and ordering are handled, migrations and compatibility, and what is tested.
+
+Each entry has: what the author decided; the alternatives they did not take; why they chose it, quoting the PR description, a commit message, the code or the ticket (if nothing says why, give the most likely reason and label it inferred); what it costs or risks; your verdict (holds, questionable, or wrong) with evidence; and the pending comments and questions that hang on it.
 
 ## Claim the PR first
 
@@ -85,9 +94,9 @@ Question whether this PR should exist in this form.
 4. **Challenge the solution.** Is this the right approach? List the alternatives (different approach, smaller change, existing mechanism, config instead of code, fix elsewhere) and why this one wins or loses.
 5. **Map requirements to changes.** For every requirement, point to the code that fulfills it. List missing behavior, extra scope, and conflicts between ticket and code.
 6. **List every assumption** the idea rests on: about users, data, volumes, ordering, other teams, and existing behavior.
-7. **Queue** every open decision and unverifiable assumption on the question list.
+7. **Record** every idea decision on the decision list, and queue every open decision and unverifiable assumption on the question list.
 
-**Output:** The problem statement, full requirement map, every assumption, alternatives considered, and idea-level findings.
+**Output:** The problem statement, full requirement map, every assumption, alternatives considered, the idea decisions, and idea-level findings.
 
 ## Phase 2: Challenge the implementation
 
@@ -99,7 +108,7 @@ Question whether the design and how it is built hold up.
 4. **Check the edges.** Invalid input, empty and large data, missing configuration, migrations and backward compatibility, security and permissions, observability.
 5. **Check the tests.** For every requirement and failure path, is there a test that would fail if it broke? List the gaps. If you cannot build or run tests in this environment, say so and mark the phase complete with limits.
 6. **Propose simpler designs** for each material concern, with benefit, cost, and effect on scope.
-7. **Queue** every design decision whose rationale is not in the evidence on the question list.
+7. **Record** every implementation decision on the decision list, and queue every design decision whose rationale is not in the evidence on the question list.
 
 **Output:** Every design decision with its verdict, every failure scenario with its outcome, test gaps, and implementation findings.
 
@@ -194,7 +203,7 @@ Two or three lines in the same voice: specific credit where earned, the verdict,
 
 This is the only phase that talks to the user.
 
-**Notify once.** If a Slack tool is available, send the user one direct message (to their own user, never a channel): the PR link and title, whether it is a first or follow-up review, the number of pending comments per classification, for a follow-up the number of prior threads per status, the number of open questions, the provisional verdict, and the link to this session if you know it. A few lines, no comment text. This is the only notification for the whole review: send no push notification or any other message, now or later in the grill. Without a Slack tool, skip this and say so in the opening message.
+**Notify once.** If a Slack tool is available, send the user one direct message (to their own user, never a channel): the PR link and title, whether it is a first or follow-up review, the number of pending comments per classification, for a follow-up the number of prior threads per status, the number of decisions to go through and how many are questionable or open, the provisional verdict, and the link to this session if you know it. A few lines, no comment text. This is the only notification for the whole review: send no push notification or any other message, now or later in the grill. Without a Slack tool, skip this and say so in the opening message.
 
 Then open the grill with one message, in this order:
 
@@ -202,23 +211,36 @@ Then open the grill with one message, in this order:
 2. **For a follow-up, the prior threads:** each with its anchor, the original comment, its status, the evidence, and any drafted reply.
 3. **Every pending comment, verbatim**, numbered, each with its `path:line` anchor, side, and classification. Include comments that failed to land, marked as such. Then, if a comment scope applies, the findings outside it under "Outside scope, not posted".
 4. **The summary body and the provisional verdict.**
-5. **The question list**, numbered, each with your recommended answer.
+5. **The decision list in brief:** one line per decision, idea decisions first, then implementation, each with your verdict. Mark the ones with an open question.
 6. **Limits:** checks you could not run and phases that finished with limits.
 
-Then invoke the `grill-me` skill and pass it the concept: first the question list, ordered so prerequisites come first, then each pending comment (keep, reword, change severity, or drop), then for a follow-up each prior thread that is not fixed (accept the answer, keep pushing with the drafted reply, or let it go). If `grill-me` is unavailable, grill directly: one question at a time, each with your recommended answer. Review-specific rules:
+### The grill
 
-- A branch ends when further answers would not change a comment, its severity, or the verdict.
+The grill is about the idea and the implementation. Its goal is that the user understands every decision the author took and has a position on it. Invoke the `grill-me` skill and pass it the concept: the decision list, idea decisions first, then implementation decisions, each group ordered so prerequisites come first, with each question list entry merged into the decision it belongs to. For each decision:
+
+1. **Explain it.** What the author decided, the alternatives, the author's reason (with its evidence, or labeled inferred), and the trade-off.
+2. **Ask one question** that makes the user take a position: would they have chosen it, does the reason hold, is the risk acceptable. Give your recommended answer and its evidence.
+
+Spend the depth on questionable or wrong decisions and open questions. Decisions that hold still get covered, but briefly: explain, confirm, move on.
+
+Code-level comments from phase 3 are not grilled one by one. They are in the opening message, and the user can change any of them at any time. A comment that hangs on a decision is settled together with that decision.
+
+For a follow-up, cover only decisions the delta introduced or changed, then each prior thread that is not fixed (accept the answer, keep pushing with the drafted reply, or let it go).
+
+If `grill-me` is unavailable, grill directly: one question at a time, each with your recommended answer. Review-specific rules:
+
+- A branch ends when the user understands the decision and further answers would not change a comment, its severity, or the verdict.
 - Record each answer, what changed, and which comments it affects.
 - Do not repeat a question or treat silence as agreement. Questions still open when the user stops stay open, and the comments they affect stay as they are.
 - Agreement with a design does not prove it correct, and disagreement does not invalidate an evidenced finding. Say so when it happens, then do what the user decides.
 
-After each decision, apply it to the pending review: edit or delete the existing pending comment, or add one only for a finding that has no comment yet, then read it back. Never post a second comment for the same finding. If your tools cannot edit a pending comment, delete it and post the revised one in its place.
+After each answer that changes a comment, apply it to the pending review: edit or delete the existing pending comment, or add one only for a finding that has no comment yet, then read it back. Never post a second comment for the same finding. If your tools cannot edit a pending comment, delete it and post the revised one in its place.
 
 End by listing the final pending comments verbatim, the summary body, and the recommended verdict. Submit only when the user tells you to, with the event they choose; otherwise tell them the review is waiting as pending on the PR for them to submit.
 
 ## Review record
 
-Keep one concise record: reviewed version and scope, each phase's state and full lists, the question list with answers, the pending review id and its comments, and verification limits.
+Keep one concise record: reviewed version and scope, each phase's state and full lists, the decision list and the question list with answers, the pending review id and its comments, and verification limits.
 
 ## Phase states
 

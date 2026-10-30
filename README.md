@@ -10,7 +10,7 @@ npx skills add Davidengstrom01/claude-skills
 |-------|--------------|
 | [grill-me](skills/grill-me/SKILL.md) | Interview relentlessly about a concept, design, or open decisions until understanding is shared |
 | [multiphase-pr-review](skills/multiphase-pr-review/SKILL.md) | Phased PR review: scope, architecture, code quality, validation |
-| [multiphase-pr-review-async](skills/multiphase-pr-review-async/SKILL.md) | Unattended phased review left as a pending GitHub review, then a grill on the comments and open questions; follow-up review only when re-requested |
+| [multiphase-pr-review-async](skills/multiphase-pr-review-async/SKILL.md) | Unattended phased review left as a pending GitHub review, then a grill on the author's idea and implementation decisions; follow-up review only when re-requested |
 | [pr-split](skills/pr-split/SKILL.md) | Split a large branch or PR into smaller draft PRs, stacked or targeting main |
 | [publish-pr](skills/publish-pr/SKILL.md) | Publish a draft PR with a ticket-key title and New/Old Behavior description |
 | [ship-review](skills/ship-review/SKILL.md) | Post review findings as a GitHub PR review |
